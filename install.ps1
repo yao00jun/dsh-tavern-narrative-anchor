@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # DSH-Tavern 叙事锚定与多维记忆压缩插件 安装脚本
 # 完美支持：桌面版 (DSH Desktop / Windows一键版EXE) 与 Web版 (命令行/浏览器版)
 # 符合官方 DSH-Tavern Plugin API v2 热插拔规范
@@ -152,5 +152,5 @@ Write-Host '     在酒馆界面右侧栏点击 [+]，即可看到「叙事锚�
 Write-Host ''
 Write-Host '【在线安装语法】' -ForegroundColor White
 Write-Host '  在任何终端或 DSH 终端执行：'
-Write-Host '  dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor' -ForegroundColor Yellow
+Write-Host '  dsh plugin --profile tavern add github:yao00jun/dsh-tavern-narrative-anchor' -ForegroundColor Yellow
 Write-Host '========================================================' -ForegroundColor Green

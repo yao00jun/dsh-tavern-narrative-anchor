@@ -38,13 +38,17 @@
 
 ### 方式一：DSH 原生在线命令安装（强烈推荐）
 
-在已配置好 DSH 的命令行中直接运行：
+在已配置好 DSH 的终端中直接运行：
 
 ```bash
-dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor
+dsh plugin --profile tavern add github:yao00jun/dsh-tavern-narrative-anchor
 ```
 
-> DSH 会自动克隆插件、注册 Cordis 包补丁并在酒馆启动时自动加载。
+> **💡 关于 `--profile tavern` 参数说明**：
+> - DSH 是多环境宿主框架：`web` profile 用于通用网页对话（例如通用破限插件 `dsh-unrestricted` 会指定 `--profile web`），而 `tavern` profile 专属于 **DSH-Tavern（酒馆）**。
+> - 酒馆专属插件（如世界书、记忆锚定、卡牌拓展）**必须安装在 `tavern` profile** 下。
+> - 在外部终端（PowerShell / CMD / Linux bash）中执行时，**务必显式携带 `--profile tavern`**，以确保插件准确写入酒馆配置，避免被误装到通用 web 目录中导致酒馆内无法识别。
+> - 若是在 DSH-Tavern 桌面客户端内置终端（设置 → 通用设置 → 打开终端）中操作，环境已默认预设为 tavern，但显式携带 `--profile tavern` 依然是最通用且不易出错的推荐写法。
 
 ---
 
@@ -64,9 +68,9 @@ dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor
 
 | 运行环境 | 宿主形态 | 推荐在线安装方式 | 离线安装与生效操作 |
 |---|---|---|---|
-| **DSH Tavern 桌面版**<br>(Windows 一键 EXE / 独立客户端) | Electron 窗口客户端 | 在桌面端进入 **设置 → 通用设置 → 打开 DSH 终端**，运行：<br>`dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor` | 运行 `run-install.cmd` 自动部署；<br>桌面端窗口按 `Ctrl+R` 或重启软件生效 |
+| **DSH Tavern 桌面版**<br>(Windows 一键 EXE / 独立客户端) | Electron 窗口客户端 | 在桌面端进入 **设置 → 通用设置 → 打开 DSH 终端**，运行：<br>`dsh plugin --profile tavern add github:yao00jun/dsh-tavern-narrative-anchor` | 运行 `run-install.cmd` 自动部署；<br>桌面端窗口按 `Ctrl+R` 或重启软件生效 |
 | **DSH Desktop 桌面版**<br>(官方客户端选用 tavern Profile) | DSH Desktop 宿主 | 在 DSH Desktop 设置中打开 DSH 终端运行安装命令 | 运行 `run-install.cmd` 自动部署；<br>刷新客户端或重载 Profile 生效 |
-| **Web版 / 命令行版**<br>(`dsh-tavern start` / 浏览器访问) | Node.js 后台服务 + 浏览器 | 在系统命令行（PowerShell / CMD / Bash）直接运行安装命令 | 运行 `run-install.cmd` 自动部署；<br>浏览器按 `F5` 刷新网页即可生效 |
+| **Web版 / 命令行版**<br>(`dsh-tavern start` / 浏览器访问) | Node.js 后台服务 + 浏览器 | 在系统命令行直接运行：<br>`dsh plugin --profile tavern add github:yao00jun/dsh-tavern-narrative-anchor` | 运行 `run-install.cmd` 自动部署；<br>浏览器按 `F5` 刷新网页即可生效 |
 
 ---
 
