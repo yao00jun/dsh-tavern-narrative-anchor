@@ -1187,7 +1187,7 @@ window.__ModuleLoader__.load({
           // 用 DSHT 官方 API 设置输入框草稿（对齐 /setinput 命令）
           const setDraftForSession = (sid, text) => {
             try {
-              const actx = props.ctx?.sessions?.scope?.(sid)
+              const actx = props.ctx?.get?.('sessions')?.scope?.(sid)
               const conversation = props.ctx?.get?.('conversation')
               if (actx && conversation && conversation.input) {
                 const input = conversation.input.for(actx)
@@ -2476,16 +2476,12 @@ window.__ModuleLoader__.load({
     }
   }
 
-  // 若 tavernUi 已就绪直接注册
-  if (ctx.tavernUi) {
-    registerTavernComponents(ctx.tavernUi)
-  }
-
-  // 动态侦听 tavernUi 服务挂载
+  // 动态侦听 tavernUi 服务挂载（严格遵守 Cordis 规范：仅在 scoped 上读取 scoped.tavernUi，避免未声明 inject 直接读取 ctx.tavernUi 抛错）
   if (typeof ctx.inject === 'function') {
     ctx.inject(['tavernUi'], (scoped) => {
-      if (scoped && scoped.tavernUi) {
-        registerTavernComponents(scoped.tavernUi)
+      const tavernUi = scoped && scoped.tavernUi
+      if (tavernUi) {
+        registerTavernComponents(tavernUi)
       }
     })
   }
@@ -2493,6 +2489,7 @@ window.__ModuleLoader__.load({
 
     return {
       name: 'dsh-tavern-narrative-anchor',
+      inject: ['slots'],
       apply: exports.apply
     };
   }
