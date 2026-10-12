@@ -1,0 +1,52 @@
+{
+  "name": "dsh-tavern-narrative-anchor",
+  "version": "1.0.0",
+  "description": "DSH-Tavern standard hot-pluggable narrative anchor and multi-dimensional memory compaction plugin",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client.js",
+    "index.mjs",
+    "cordis.patch.yml",
+    "run-install.cmd",
+    "install.ps1",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-tavern",
+    "tavern",
+    "tavern-plugin",
+    "narrative-anchor",
+    "memory",
+    "compaction"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "tavernUi",
+        "betterSidebar",
+        "sessions"
+      ]
+    },
+    "compatibility": {
+      "tavern": ">=2.6.0"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
