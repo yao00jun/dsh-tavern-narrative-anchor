@@ -7,63 +7,29 @@
  * - 深度集成 Discussion #184 8维多维结构化上下文压缩协议（ctx.tavern.compactionSection）
  * - 动态世界书条目原生召回（ctx.tavern.worldbookEntries）
  * - 按轮原生持久化（ctx.tavern.saveTurnData / readTurnData）与跨剧情线回退自愈
+ * - 生命周期侦听（onTimelineChanged / onGameRemoved）
  * - 前后端标准 RPC 交互（ctx.tavern.handle / ctx.tavernUi.callHost）
  */
 
-import { readAnchor, writeAnchor, readSnapshotLog, writeSnapshotLog } from './lib/data-store.js'
+import { readAnchor, writeAnchor } from './lib/data-store.js'
 import {
-  loadAnchor,
   createEmptyAnchor,
   applyAnchorSubmission,
   formatAnchorForInjection,
-  getAnchorStats,
-  updateLtmSnapshot
+  getAnchorStats
 } from './lib/settlement/store.js'
 import {
   NARRATIVE_ANCHOR_READ_TOOL,
   NARRATIVE_ANCHOR_SUBMIT_TOOL,
-  searchAnchorMemory,
-  anchorSnapshot
+  searchAnchorMemory
 } from './lib/settlement/strategies.js'
 import { COMPACTION_8DIM_PROMPT } from './lib/prompts/compactor-8dim.js'
 import { SETTLEMENT_INSTRUCTIONS } from './lib/prompts/settlement-rules.js'
-import {
-  readSessionWorldbook,
-  loadSessionWorldbook,
-  writeSessionWorldbook,
-  listSessionWorldbooks,
-  selectedEntries,
-  toWorldbookEntries
-} from './lib/session-worldbook.js'
-import {
-  listCombos,
-  createCombo,
-  updateCombo,
-  deleteCombo,
-  listGlobalAutoBind,
-  setGlobalAutoBind,
-  toggleGlobalAutoBind
-} from './lib/worldbook-combos.js'
-import {
-  resolveTavernDataRoot,
-  readChatFromDisk,
-  readLatestChatFromDisk
-} from './lib/official-worldbook.js'
-import {
-  setFamilyDataRoot,
-  resolveFamilyId,
-  registerBranch,
-  familyMembers,
-  rootOf,
-  readRegistry,
-  unregisterBranch,
-  sessionAlive,
-  sessionTitle,
-  deleteFamilyFile
-} from './lib/family.js'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { existsSync } from 'node:fs'
+import { readSessionWorldbook } from './lib/session-worldbook.js'
+import { resolveTavernDataRoot } from './lib/official-worldbook.js'
+import { setFamilyDataRoot } from './lib/family.js'
+import { handleRpc, SUPPORTED_RPC_METHODS } from './lib/router.js'
+import { createHash } from 'node:crypto'
 
 export const name = 'dsh-tavern-narrative-anchor'
 export const inject = ['tavern', 'webServer']
@@ -74,7 +40,6 @@ export function apply(ctx) {
     return
   }
 
-  const here = dirname(fileURLToPath(import.meta.url))
   setFamilyDataRoot(resolveTavernDataRoot(undefined, []))
 
   // ────────────────── 1. 后台结算工具 ──────────────────
@@ -164,33 +129,37 @@ export function apply(ctx) {
 
         // 5a. 已知客观情报 (known_facts)
         if (anchor && Array.isArray(anchor.memory?.known_facts)) {
-          for (const fact of anchor.memory.known_facts) {
-            if (!fact || !fact.entry) continue
-            const kw = Array.isArray(fact.keywords) && fact.keywords.length > 0 ? fact.keywords : [fact.entry]
+          anchor.memory.known_facts.forEach((fact, i) => {
+            if (!fact || !fact.entry) return
+            const kw = Array.isArray(fact.keywords) && fact.keywords.length > 0 ? fact.keywords : [String(fact.entry)]
+            // POOL_ENTRY_ID 严格限制 /^[A-Za-z0-9._-]{1,64}$/
+            // 使用稳定 hash + 序号，彻底防止中文标题导致的字符丢失与 ID 冲突
+            const hash = createHash('md5').update(String(fact.entry)).digest('hex').slice(0, 12)
             list.push({
-              id: 'kf-' + String(fact.id || fact.entry).replace(/[^\w-]/g, '_'),
-              title: fact.entry,
-              content: fact.summary || '',
+              id: `kf_${i}_${hash}`,
+              title: String(fact.entry).slice(0, 200),
+              content: String(fact.summary || '').slice(0, 4000),
               keys: kw,
               constant: false
             })
-          }
+          })
         }
 
         // 5b. 会话临时世界书 (session-worldbook)
         const book = readSessionWorldbook(gameId)
         if (book && book.enabled !== false && Array.isArray(book.entries)) {
-          for (const entry of book.entries) {
-            if (!entry || entry.enabled === false) continue
+          book.entries.forEach((entry, i) => {
+            if (!entry || entry.enabled === false) return
+            const hash = createHash('md5').update(String(entry.title || i)).digest('hex').slice(0, 12)
             list.push({
-              id: 'swb-' + String(entry.id || entry.title).replace(/[^\w-]/g, '_'),
-              title: entry.title || '',
-              content: entry.content || '',
+              id: `swb_${i}_${hash}`,
+              title: String(entry.title || '').slice(0, 200),
+              content: String(entry.content || '').slice(0, 4000),
               keys: Array.isArray(entry.keys) ? entry.keys : [],
               secondaryKeys: Array.isArray(entry.keysecondary) ? entry.keysecondary : [],
               constant: entry.constant === true
             })
-          }
+          })
         }
       } catch (e) {
         console.error('[dsh-tavern-narrative-anchor] worldbookEntries 召回异常:', e)
@@ -199,158 +168,23 @@ export function apply(ctx) {
     }
   })
 
-  // ────────────────── 6. 核心 RPC 处理程序 (ctx.tavern.handle) ──────────────────
+  // ────────────────── 6. 生命周期钩子侦听 ──────────────────
+  ctx.tavern.onTimelineChanged?.(({ gameId, change }) => {
+    console.log(`[dsh-tavern-narrative-anchor] 剧情线发生变动 (${change?.kind || '未知'}):`, gameId)
+  })
 
-  async function handleRpc(method, body = {}) {
-    const sessionId = body.sessionId || body.gameId || ''
+  ctx.tavern.onGameRemoved?.(({ gameId }) => {
+    console.log(`[dsh-tavern-narrative-anchor] 游戏会话已移除:`, gameId)
+  })
 
-    switch (method) {
-      case 'getConfig': {
-        const anchor = readAnchor(sessionId) || createEmptyAnchor()
-        const settings = anchor.meta?.settings || {}
-        return {
-          ok: true,
-          settings: {
-            enabled: settings.enabled !== false,
-            maxSTMLength: settings.maxSTMLength || 7,
-            injectPosition: settings.injectPosition || 'after',
-            projectionReplace: settings.projectionReplace === true,
-            skipAllPresentLtm: settings.skipAllPresentLtm !== false
-          },
-          stats: getAnchorStats(anchor)
-        }
-      }
-
-      case 'setConfig': {
-        const anchor = readAnchor(sessionId) || createEmptyAnchor()
-        if (!anchor.meta.settings) anchor.meta.settings = {}
-        if (typeof body.maxSTMLength === 'number') anchor.meta.settings.maxSTMLength = Math.max(1, Math.min(50, Math.floor(body.maxSTMLength)))
-        if (typeof body.injectPosition === 'string') anchor.meta.settings.injectPosition = body.injectPosition
-        if (typeof body.enabled === 'boolean') anchor.meta.settings.enabled = body.enabled
-        if (typeof body.projectionReplace === 'boolean') anchor.meta.settings.projectionReplace = body.projectionReplace
-        if (typeof body.skipAllPresentLtm === 'boolean') anchor.meta.settings.skipAllPresentLtm = body.skipAllPresentLtm
-
-        if (body.reset === true) {
-          anchor.plot_route = { current_node: '', recap: '', next_scene: '', foreshadowing: [] }
-          anchor.current_state = { time: '', world: '', location: '', characters: [], environment: [], items: [], focus: '', focus_full: '' }
-          anchor.memory = { stm: [], ltm_tree: { nodes: {}, roots: [], next_id: 1 }, ltm_snapshot: { content: '', turn: 0 }, known_facts: [], foreshadow_library: [] }
-        }
-
-        anchor.meta.updated_at = Date.now()
-        writeAnchor(sessionId, anchor)
-        return { ok: true, note: '设置已更新并持久化' }
-      }
-
-      case 'getData': {
-        const anchor = readAnchor(sessionId)
-        if (!anchor) return { ok: true, anchor: null, display: '（暂无数据）' }
-        return { ok: true, anchor, display: formatAnchorForInjection(anchor) }
-      }
-
-      case 'updateData': {
-        const anchor = readAnchor(sessionId) || createEmptyAnchor()
-        if (!body.data || typeof body.data !== 'object') {
-          return { ok: false, error: '缺少 data 参数' }
-        }
-        const incoming = body.data
-        if (incoming.current_state && typeof incoming.current_state === 'object') anchor.current_state = incoming.current_state
-        if (incoming.memory && typeof incoming.memory === 'object') {
-          if (Array.isArray(incoming.memory.stm)) anchor.memory.stm = incoming.memory.stm
-          if (incoming.memory.ltm_tree && typeof incoming.memory.ltm_tree === 'object') anchor.memory.ltm_tree = incoming.memory.ltm_tree
-          if (Array.isArray(incoming.memory.known_facts)) anchor.memory.known_facts = incoming.memory.known_facts
-        }
-        updateLtmSnapshot(anchor)
-        anchor.meta.updated_at = Date.now()
-        writeAnchor(sessionId, anchor)
-        return { ok: true, note: '锚点数据已更新', stats: getAnchorStats(anchor) }
-      }
-
-      case 'getPosture': {
-        return { ok: true, posture: '', postureEnabled: true, lastSettle: null }
-      }
-
-      case 'worldbook/list': {
-        return { ok: true, sessions: listSessionWorldbooks() }
-      }
-
-      case 'worldbook/get': {
-        const book = loadSessionWorldbook(sessionId)
-        return { ok: true, book }
-      }
-
-      case 'worldbook/save': {
-        if (!body.book || typeof body.book !== 'object') return { ok: false, error: '缺少 book 数据' }
-        const ok = writeSessionWorldbook(body.book)
-        return { ok }
-      }
-
-      case 'worldbook/combos': {
-        return { ok: true, combos: listCombos(), globalAutoBind: listGlobalAutoBind() }
-      }
-
-      case 'branch/prepare': {
-        const dataRoot = resolveTavernDataRoot(undefined, [])
-        const diskChat = readChatFromDisk(dataRoot, sessionId)
-        let latestTurn = 0
-        let cardName = diskChat?.cardName || ''
-        if (diskChat && Array.isArray(diskChat.messages)) {
-          for (const m of diskChat.messages) {
-            const t = Number(m?.turn) || 0
-            if (t > latestTurn) latestTurn = t
-          }
-        }
-        return { ok: true, chatId: diskChat?.id || sessionId, sessionId, turn: latestTurn, cardName }
-      }
-
-      case 'branch/register': {
-        const sid = String(body.sessionId || '')
-        const parentSid = String(body.parentSid || '')
-        if (!sid || !parentSid) return { ok: false, error: '需要 sessionId 与 parentSid' }
-        const familyId = String(body.familyId || '') || rootOf(parentSid)
-        const member = registerBranch({ sessionId: sid, familyId, parentSid, label: body.label })
-        return { ok: true, member }
-      }
-
-      case 'branch/list': {
-        const fid = body.familyId || resolveFamilyId(sessionId)
-        return { ok: true, familyId: fid, members: familyMembers(fid) }
-      }
-
-      case 'branch/delete': {
-        const sid = body.sessionId
-        unregisterBranch(sid)
-        return { ok: true }
-      }
-
-      default:
-        return { ok: false, error: `未知的操作方法: ${method}` }
-    }
-  }
-
-  // 注册所有 tavern RPC 方法
-  const rpcMethods = [
-    'getConfig',
-    'setConfig',
-    'getData',
-    'updateData',
-    'getPosture',
-    'worldbook/list',
-    'worldbook/get',
-    'worldbook/save',
-    'worldbook/combos',
-    'branch/prepare',
-    'branch/register',
-    'branch/list',
-    'branch/delete'
-  ]
-
-  for (const method of rpcMethods) {
+  // ────────────────── 7. 前端 RPC 处理程序 (ctx.tavern.handle) ──────────────────
+  for (const method of SUPPORTED_RPC_METHODS) {
     ctx.tavern.handle(`dsh-tavern-narrative-anchor/${method}`, async (args) => {
-      return handleRpc(method, args)
+      return handleRpc(method, args, ctx)
     })
   }
 
-  // ────────────────── 7. 向下兼容 HTTP 接口（若有独立前端通过 fetch 访问） ──────────────────
+  // ────────────────── 8. 向下兼容 HTTP 接口（若有独立前端通过 fetch 访问） ──────────────────
   ctx.effect(() => {
     const webServer = ctx.get('webServer')
     if (!webServer || typeof webServer.register !== 'function') return
@@ -367,8 +201,11 @@ export function apply(ctx) {
           for await (const chunk of req) chunks.push(chunk)
           try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { body = {} }
         }
-        const result = await handleRpc(method, body)
-        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+        const result = await handleRpc(method, body, ctx)
+        res.writeHead(result?.ok !== false ? 200 : 400, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        })
         res.end(JSON.stringify(result))
       }
     })
