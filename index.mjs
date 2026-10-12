@@ -32,7 +32,7 @@ import { handleRpc, SUPPORTED_RPC_METHODS } from './lib/router.js'
 import { createHash } from 'node:crypto'
 
 export const name = 'dsh-tavern-narrative-anchor'
-export const inject = ['tavern', 'webServer']
+export const inject = ['tavern']
 
 export function apply(ctx) {
   if (!ctx.tavern) {
@@ -185,31 +185,35 @@ export function apply(ctx) {
   }
 
   // ────────────────── 8. 向下兼容 HTTP 接口（若有独立前端通过 fetch 访问） ──────────────────
-  ctx.effect(() => {
-    const webServer = ctx.get('webServer')
-    if (!webServer || typeof webServer.register !== 'function') return
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (scoped) => {
+      const webServer = scoped?.webServer || (typeof scoped?.get === 'function' ? scoped.get('webServer') : undefined)
+      if (!webServer || typeof webServer.register !== 'function') return
 
-    return webServer.register({
-      kind: 'prefix',
-      path: '/api/narrative-anchor',
-      handler: async (req, res) => {
-        const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
-        const method = pathname.replace('/api/narrative-anchor/', '')
-        let body = {}
-        if (req.method === 'POST') {
-          const chunks = []
-          for await (const chunk of req) chunks.push(chunk)
-          try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { body = {} }
-        }
-        const result = await handleRpc(method, body, ctx)
-        res.writeHead(result?.ok !== false ? 200 : 400, {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Cache-Control': 'no-store'
+      scoped.effect(() => {
+        return webServer.register({
+          kind: 'prefix',
+          path: '/api/narrative-anchor',
+          handler: async (req, res) => {
+            const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
+            const method = pathname.replace('/api/narrative-anchor/', '')
+            let body = {}
+            if (req.method === 'POST') {
+              const chunks = []
+              for await (const chunk of req) chunks.push(chunk)
+              try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { body = {} }
+            }
+            const result = await handleRpc(method, body, ctx)
+            res.writeHead(result?.ok !== false ? 200 : 400, {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Cache-Control': 'no-store'
+            })
+            res.end(JSON.stringify(result))
+          }
         })
-        res.end(JSON.stringify(result))
-      }
+      }, 'dsh-tavern-narrative-anchor: legacy webServer')
     })
-  }, 'dsh-tavern-narrative-anchor: legacy webServer')
+  }
 
   console.log('[dsh-tavern-narrative-anchor] 插件已通过官方 Tavern API v2 规范成功挂载！')
 }

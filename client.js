@@ -239,12 +239,20 @@ window.__ModuleLoader__.load({
         console.warn('[dsh-tavern-narrative-anchor] callHost 异常，尝试 HTTP 回退:', rpcErr)
       }
     }
-    const res = await fetch('/api/narrative-anchor/' + method, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    return res.json()
+    try {
+      const res = await fetch('/api/narrative-anchor/' + method, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(text || `HTTP ${res.status}`)
+      }
+      return await res.json()
+    } catch (fetchErr) {
+      throw new Error(`请求服务不可用: ${fetchErr.message}`)
+    }
   }
 
   // ========== 设置页面组件 ==========
