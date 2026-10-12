@@ -53,8 +53,20 @@ dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor
 1. 在 GitHub 本仓库的 [Releases](../../releases) 页面下载最新的 `dsh-tavern-narrative-anchor-v1.0.0.zip`。
 2. 解压 zip 压缩包。
 3. 双击运行其中的 **`run-install.cmd`**。
-4. 安装脚本会自动检测你的 DSH-Tavern 安装路径并部署到 `plugins/` 目录。
-5. 打开或刷新酒馆网页，即可直接使用！
+4. 安装脚本会自动检测你的 DSH-Tavern 安装路径（支持一键桌面版、DSH Desktop、Web版/命令行版同时检测并部署）并部署到 `plugins/` 目录。
+5. 打开或刷新酒馆，即可直接使用！
+
+---
+
+### 🖥️ 桌面版与 🌐 Web版 使用对照说明
+
+本插件完全遵照官方规范开发，**原生同时支持桌面版与 Web版**：
+
+| 运行环境 | 宿主形态 | 推荐在线安装方式 | 离线安装与生效操作 |
+|---|---|---|---|
+| **DSH Tavern 桌面版**<br>(Windows 一键 EXE / 独立客户端) | Electron 窗口客户端 | 在桌面端进入 **设置 → 通用设置 → 打开 DSH 终端**，运行：<br>`dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor` | 运行 `run-install.cmd` 自动部署；<br>桌面端窗口按 `Ctrl+R` 或重启软件生效 |
+| **DSH Desktop 桌面版**<br>(官方客户端选用 tavern Profile) | DSH Desktop 宿主 | 在 DSH Desktop 设置中打开 DSH 终端运行安装命令 | 运行 `run-install.cmd` 自动部署；<br>刷新客户端或重载 Profile 生效 |
+| **Web版 / 命令行版**<br>(`dsh-tavern start` / 浏览器访问) | Node.js 后台服务 + 浏览器 | 在系统命令行（PowerShell / CMD / Bash）直接运行安装命令 | 运行 `run-install.cmd` 自动部署；<br>浏览器按 `F5` 刷新网页即可生效 |
 
 ---
 
