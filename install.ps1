@@ -100,5 +100,5 @@ Write-Host '  3. 打开酒馆右侧栏点击 [+]，即可看到「叙事锚定�
 Write-Host ''
 Write-Host '【在线安装语法】' -ForegroundColor White
 Write-Host '  上传到 GitHub 后，任何人只需在 DSH 终端执行：'
-Write-Host '  dsh plugin add github:<你的用户名>/dsh-tavern-narrative-anchor' -ForegroundColor Yellow
+Write-Host '  dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor' -ForegroundColor Yellow
 Write-Host '========================================================' -ForegroundColor Green

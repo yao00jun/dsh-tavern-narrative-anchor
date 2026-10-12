@@ -41,7 +41,7 @@
 在已配置好 DSH 的命令行中直接运行：
 
 ```bash
-dsh plugin add github:<你的GitHub用户名>/dsh-tavern-narrative-anchor
+dsh plugin add github:yao00jun/dsh-tavern-narrative-anchor
 ```
 
 > DSH 会自动克隆插件、注册 Cordis 包补丁并在酒馆启动时自动加载。

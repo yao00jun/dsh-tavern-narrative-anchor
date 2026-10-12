@@ -2,6 +2,11 @@
   "name": "dsh-tavern-narrative-anchor",
   "version": "1.0.0",
   "description": "DSH-Tavern standard hot-pluggable narrative anchor and multi-dimensional memory compaction plugin",
+  "author": "yao00jun",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yao00jun/dsh-tavern-narrative-anchor.git"
+  },
   "type": "module",
   "main": "index.mjs",
   "exports": {
