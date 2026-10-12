@@ -229,8 +229,16 @@ window.__ModuleLoader__.load({
     document.head.appendChild(naStyle)
   }
 
-  // ========== 后端 API 调用 ==========
+  // ========== 后端 API 调用 (优先使用官方 tavernUi.callHost RPC，回退使用 HTTP) ==========
   async function api(method, payload = {}) {
+    if (globalTavernUi && typeof globalTavernUi.callHost === 'function') {
+      try {
+        const rpcResult = await globalTavernUi.callHost('dsh-tavern-narrative-anchor/' + method, payload)
+        if (rpcResult !== undefined) return rpcResult
+      } catch (rpcErr) {
+        console.warn('[dsh-tavern-narrative-anchor] callHost 异常，尝试 HTTP 回退:', rpcErr)
+      }
+    }
     const res = await fetch('/api/narrative-anchor/' + method, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2409,73 +2417,83 @@ window.__ModuleLoader__.load({
     )
   }
 
+  const getUiConversation = () => ctx.get('uiConversation') || ctx.get('conversation')
+
   // ========== 官方 DSH-Tavern Plugin API v2 侧边栏组与面板注册 ==========
-  if (ctx.tavernUi) {
-    globalTavernUi = ctx.tavernUi
+  let registered = false
+  const registerTavernComponents = (tavernUi) => {
+    if (!tavernUi || registered) return
+    registered = true
+    globalTavernUi = tavernUi
+
     try {
-      if (typeof ctx.tavernUi.registerStartGroup === 'function') {
-        ctx.tavernUi.registerStartGroup({
-          title: '叙事锚定',
-          tabs: ['narrative-anchor:status', 'narrative-anchor:worldbook', 'narrative-anchor:settings']
-        })
-      }
-      if (typeof ctx.tavernUi.registerPanel === 'function') {
-        ctx.tavernUi.registerPanel({
-          id: 'narrative-anchor:status',
+      // 1. 注册 3 个独立侧边栏面板 (id 严格遵守 [a-z0-9._-] 规范，不能包含冒号)
+      if (typeof tavernUi.registerPanel === 'function') {
+        tavernUi.registerPanel({
+          id: 'status',
           title: '锚点状态',
-          render: ({ gameId }) => h(NarrativeAnchorStatusTab, { sessionId: gameId, scope: { sessionId: gameId }, uiConversation: getUiConversation })
+          render: ({ gameId }) => h(NarrativeAnchorStatusTab, {
+            gameId,
+            sessionId: gameId,
+            scope: { sessionId: gameId },
+            uiConversation: getUiConversation
+          })
         })
-        ctx.tavernUi.registerPanel({
-          id: 'narrative-anchor:worldbook',
+        tavernUi.registerPanel({
+          id: 'worldbook',
           title: '会话世界书',
-          render: ({ gameId }) => h(NarrativeAnchorWorldbookTab, { sessionId: gameId, scope: { sessionId: gameId }, uiConversation: getUiConversation, sessions: ctx.sessions, ctx })
+          render: ({ gameId }) => h(NarrativeAnchorWorldbookTab, {
+            gameId,
+            sessionId: gameId,
+            scope: { sessionId: gameId },
+            uiConversation: getUiConversation,
+            ctx
+          })
         })
-        ctx.tavernUi.registerPanel({
-          id: 'narrative-anchor:settings',
+        tavernUi.registerPanel({
+          id: 'settings',
           title: '锚定设置',
-          render: ({ gameId }) => h(NarrativeAnchorSettingsTab, { sessionId: gameId, scope: { sessionId: gameId }, uiConversation: getUiConversation })
+          render: ({ gameId }) => h(NarrativeAnchorSettingsTab, {
+            gameId,
+            sessionId: gameId,
+            scope: { sessionId: gameId },
+            uiConversation: getUiConversation
+          })
         })
       }
+
+      // 2. 注册开始页面上的分组「叙事锚定」
+      // registerStartGroup 传入 bare id 'status' 会自动映射为 'tavern-plugin:dsh-tavern-narrative-anchor:status'
+      if (typeof tavernUi.registerStartGroup === 'function') {
+        tavernUi.registerStartGroup({
+          title: '叙事锚定',
+          tabs: ['status', 'worldbook', 'settings']
+        })
+      }
+      console.log('[dsh-tavern-narrative-anchor] 客户端成功注册「叙事锚定」分组与 3 个面板')
     } catch (e) {
       console.warn('[dsh-tavern-narrative-anchor] tavernUi 侧边栏注册异常:', e)
     }
   }
 
-  // ========== 注册侧边栏 tab（延迟到 betterSidebar 服务可用，模式同 tavern-plugin）==========
-  const getUiConversation = () => ctx.get('uiConversation') || ctx.get('conversation')
-  ctx.effect(() => ctx.betterSidebar.registerTab({
-    id: 'narrative-anchor:settings',
-    title: '叙事锚定设置',
-    order: 9,
-    single: true,
-    createTab: () => ({ tab: { id: 'narrative-anchor:settings', type: 'narrative-anchor:settings', title: '叙事锚定设置' }, patch: { panelOpen: true } }),
-    component: props => h(NarrativeAnchorSettingsTab, { sessionId: props.scope?.sessionId, scope: props.scope, uiConversation: getUiConversation })
-  }), 'narrative-anchor: settings tab')
+  // 若 tavernUi 已就绪直接注册
+  if (ctx.tavernUi) {
+    registerTavernComponents(ctx.tavernUi)
+  }
 
-  ctx.effect(() => ctx.betterSidebar.registerTab({
-    id: 'narrative-anchor:status',
-    title: '叙事锚定状态',
-    order: 8,
-    single: true,
-    createTab: () => ({ tab: { id: 'narrative-anchor:status', type: 'narrative-anchor:status', title: '叙事锚定状态' }, patch: { panelOpen: true } }),
-    component: props => h(NarrativeAnchorStatusTab, { sessionId: props.scope?.sessionId, scope: props.scope, uiConversation: getUiConversation })
-  }), 'narrative-anchor: status tab')
-
-  ctx.effect(() => ctx.betterSidebar.registerTab({
-    id: 'narrative-anchor:worldbook',
-    title: '会话世界书',
-    order: 7,
-    single: true,
-    createTab: () => ({ tab: { id: 'narrative-anchor:worldbook', type: 'narrative-anchor:worldbook', title: '会话世界书' }, patch: { panelOpen: true } }),
-    component: props => h(NarrativeAnchorWorldbookTab, { sessionId: props.scope?.sessionId, scope: props.scope, uiConversation: getUiConversation, sessions: ctx.sessions, ctx })
-  }), 'narrative-anchor: worldbook tab')
-
-  console.log('[narrative-anchor] 客户端已注册 3 个侧边栏 tab')
+  // 动态侦听 tavernUi 服务挂载
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['tavernUi'], (scoped) => {
+      if (scoped && scoped.tavernUi) {
+        registerTavernComponents(scoped.tavernUi)
+      }
+    })
+  }
     }
 
-    module.exports.name = 'dsh-tavern-narrative-anchor'
-    module.exports.inject = ['tavernUi', 'betterSidebar', 'sessions']
-
-    return module.exports;
+    return {
+      name: 'dsh-tavern-narrative-anchor',
+      apply: exports.apply
+    };
   }
 });

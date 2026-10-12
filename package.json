@@ -41,10 +41,10 @@
     },
     "client": {
       "platform": "web",
+      "immediately": true,
       "inject": [
-        "tavernUi",
-        "betterSidebar",
-        "sessions"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "dsh-tavern-plugin"
       ]
     },
     "compatibility": {
