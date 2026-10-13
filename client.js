@@ -229,21 +229,35 @@ window.__ModuleLoader__.load({
     document.head.appendChild(naStyle)
   }
 
+  function toHandlerKey(method) {
+    const kebab = String(method || '').replace(/[A-Z]/g, c => '-' + c.toLowerCase())
+    return 'dsh-tavern-narrative-anchor/' + kebab
+  }
+
   // ========== 后端 API 调用 (优先使用官方 tavernUi.callHost RPC，回退使用 HTTP) ==========
   async function api(method, payload = {}) {
+    let rpcError = null
+    const handlerKey = toHandlerKey(method)
+    const effectivePayload = {
+      ...payload,
+      gameId: payload.gameId || payload.sessionId || '',
+      sessionId: payload.sessionId || payload.gameId || ''
+    }
+
     if (globalTavernUi && typeof globalTavernUi.callHost === 'function') {
       try {
-        const rpcResult = await globalTavernUi.callHost('dsh-tavern-narrative-anchor/' + method, payload)
+        const rpcResult = await globalTavernUi.callHost(handlerKey, effectivePayload)
         if (rpcResult !== undefined) return rpcResult
       } catch (rpcErr) {
-        console.warn('[dsh-tavern-narrative-anchor] callHost 异常，尝试 HTTP 回退:', rpcErr)
+        rpcError = rpcErr
+        console.warn(`[dsh-tavern-narrative-anchor] callHost(${handlerKey}) 异常，尝试 HTTP 回退:`, rpcErr)
       }
     }
     try {
       const res = await fetch('/api/narrative-anchor/' + method, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(effectivePayload)
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -251,6 +265,9 @@ window.__ModuleLoader__.load({
       }
       return await res.json()
     } catch (fetchErr) {
+      if (rpcError) {
+        throw new Error(`RPC失败: ${rpcError.message || rpcError} (HTTP回退亦失败: ${fetchErr.message})`)
+      }
       throw new Error(`请求服务不可用: ${fetchErr.message}`)
     }
   }

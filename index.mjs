@@ -28,14 +28,27 @@ import { SETTLEMENT_INSTRUCTIONS } from './lib/prompts/settlement-rules.js'
 import { readSessionWorldbook } from './lib/session-worldbook.js'
 import { resolveTavernDataRoot } from './lib/official-worldbook.js'
 import { setFamilyDataRoot } from './lib/family.js'
-import { handleRpc, SUPPORTED_RPC_METHODS } from './lib/router.js'
+import { handleRpc, SUPPORTED_RPC_METHODS, toHandlerKey } from './lib/router.js'
 import { createHash } from 'node:crypto'
+import fs from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const logFile = join(here, 'backend.log')
+function logInfo(msg) {
+  try {
+    fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${msg}\n`)
+  } catch {}
+}
 
 export const name = 'dsh-tavern-narrative-anchor'
 export const inject = ['tavern']
 
 export function apply(ctx) {
+  logInfo('apply(ctx) 开始执行，ctx.tavern=' + !!ctx.tavern)
   if (!ctx.tavern) {
+    logInfo('未检测到 ctx.tavern，跳过装载')
     console.warn('[dsh-tavern-narrative-anchor] 未检测到 ctx.tavern，跳过酒馆宿主侧装载。')
     return
   }
@@ -178,42 +191,69 @@ export function apply(ctx) {
   })
 
   // ────────────────── 7. 前端 RPC 处理程序 (ctx.tavern.handle) ──────────────────
+  let registeredCount = 0
   for (const method of SUPPORTED_RPC_METHODS) {
-    ctx.tavern.handle(`dsh-tavern-narrative-anchor/${method}`, async (args) => {
-      return handleRpc(method, args, ctx)
-    })
+    const handlerKey = toHandlerKey(method)
+    try {
+      ctx.tavern.handle(handlerKey, async (args) => {
+        logInfo(`RPC 调用: ${handlerKey}`)
+        try {
+          const res = await handleRpc(method, args, ctx)
+          return res
+        } catch (callErr) {
+          logInfo(`RPC 执行错误 [${handlerKey}]: ${callErr?.message || callErr}`)
+          throw callErr
+        }
+      })
+      registeredCount++
+    } catch (err) {
+      logInfo(`注册 RPC 处理器 ${handlerKey} 失败: ${err?.message || err}`)
+      console.warn(`[dsh-tavern-narrative-anchor] 注册 RPC 处理器 ${handlerKey} 失败:`, err)
+    }
   }
+  logInfo(`成功注册 ${registeredCount}/${SUPPORTED_RPC_METHODS.length} 个 RPC 处理器`)
 
   // ────────────────── 8. 向下兼容 HTTP 接口（若有独立前端通过 fetch 访问） ──────────────────
-  if (typeof ctx.inject === 'function') {
-    ctx.inject(['webServer'], (scoped) => {
-      const webServer = scoped?.webServer || (typeof scoped?.get === 'function' ? scoped.get('webServer') : undefined)
-      if (!webServer || typeof webServer.register !== 'function') return
-
-      scoped.effect(() => {
-        return webServer.register({
-          kind: 'prefix',
-          path: '/api/narrative-anchor',
-          handler: async (req, res) => {
-            const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
-            const method = pathname.replace('/api/narrative-anchor/', '')
-            let body = {}
-            if (req.method === 'POST') {
-              const chunks = []
-              for await (const chunk of req) chunks.push(chunk)
-              try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { body = {} }
-            }
-            const result = await handleRpc(method, body, ctx)
-            res.writeHead(result?.ok !== false ? 200 : 400, {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Cache-Control': 'no-store'
-            })
-            res.end(JSON.stringify(result))
+  const registerHttp = (webServer, targetCtx) => {
+    if (!webServer || typeof webServer.register !== 'function') return
+    const effect = targetCtx && typeof targetCtx.effect === 'function'
+      ? targetCtx.effect.bind(targetCtx)
+      : (fn => fn())
+    effect(() => {
+      return webServer.register({
+        kind: 'prefix',
+        path: '/api/narrative-anchor',
+        handler: async (req, res) => {
+          const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
+          const rawMethod = pathname.replace(/^\/api\/narrative-anchor\/?/, '')
+          let body = {}
+          if (req.method === 'POST') {
+            const chunks = []
+            for await (const chunk of req) chunks.push(chunk)
+            try { body = JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { body = {} }
           }
-        })
-      }, 'dsh-tavern-narrative-anchor: legacy webServer')
+          const result = await handleRpc(rawMethod, body, ctx)
+          res.writeHead(result?.ok !== false ? 200 : 400, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+          })
+          res.end(JSON.stringify(result))
+        }
+      })
+    }, 'dsh-tavern-narrative-anchor: webServer routes')
+    logInfo('HTTP 路由 /api/narrative-anchor 已注册')
+  }
+
+  const directWs = (typeof ctx.get === 'function' ? ctx.get('webServer') : undefined) || ctx.webServer
+  if (directWs) {
+    registerHttp(directWs, ctx)
+  } else if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (scoped) => {
+      const ws = (typeof scoped?.get === 'function' ? scoped.get('webServer') : undefined) || scoped?.webServer
+      registerHttp(ws, scoped)
     })
   }
 
+  logInfo('apply(ctx) 全部执行完毕！')
   console.log('[dsh-tavern-narrative-anchor] 插件已通过官方 Tavern API v2 规范成功挂载！')
 }
