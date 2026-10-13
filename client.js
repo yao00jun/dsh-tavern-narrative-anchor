@@ -156,8 +156,58 @@ window.__ModuleLoader__.load({
 .na-page label { display:flex; align-items:flex-start; gap:9px; padding:6px 7px; border-radius:7px; cursor:pointer; color:var(--na-text); font-size:12.5px; line-height:1.5; }
 .na-page label:hover { background:var(--na-hover); }
 .na-page label > span:first-child { flex:1; }
-.na-page label input[type=checkbox] { margin-top:2px; width:14px; height:14px; accent-color:var(--na-accent); cursor:pointer; flex:none; }
-.na-page input[type=checkbox] { accent-color:var(--na-accent); cursor:pointer; }
+.na-page label input[type=checkbox]:not([role=switch]) { margin-top:2px; width:14px; height:14px; accent-color:var(--na-accent); cursor:pointer; flex:none; }
+.na-page input[type=checkbox]:not([role=switch]) { accent-color:var(--na-accent); cursor:pointer; }
+.na-page input[role=switch],
+.na-page label input[role=switch],
+.dsh-tavern-background-task input[role=switch] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative !important;
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 22px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  background: #475569 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: background .2s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+.na-page input[role=switch]::after,
+.na-page label input[role=switch]::after,
+.dsh-tavern-background-task input[role=switch]::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35) !important;
+  transition: transform .2s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+.na-page input[role=switch]:checked,
+.na-page label input[role=switch]:checked,
+.dsh-tavern-background-task input[role=switch]:checked {
+  background: #10b981 !important;
+}
+.na-page input[role=switch]:checked::after,
+.na-page label input[role=switch]:checked::after,
+.dsh-tavern-background-task input[role=switch]:checked::after {
+  transform: translateX(16px) !important;
+}
+.na-page input[role=switch]:disabled,
+.na-page label input[role=switch]:disabled,
+.dsh-tavern-background-task input[role=switch]:disabled {
+  opacity: .5 !important;
+  cursor: not-allowed !important;
+}
 .na-page .dsh-local-btn { background:var(--na-btn); color:var(--na-text); border:1px solid var(--na-btn-border); border-radius:7px; padding:4px 11px; font-size:12px; cursor:pointer; transition:all .15s; line-height:1.5; }
 .na-page .dsh-local-btn:hover { background:var(--na-btn-hover); border-color:var(--na-accent); color:var(--na-heading); }
 .na-page .dsh-local-btn[disabled] { opacity:.45; cursor:not-allowed; }
