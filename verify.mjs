@@ -11,9 +11,9 @@ const pluginDir = path.dirname(fileURLToPath(import.meta.url))
 const DSH_HOME = path.resolve(process.argv[2] || path.resolve(pluginDir, '..', '..', '..', '..', '..'))
 
 const EXPECTED = {
-  'package.json': 'df661bd5cb6c1da740470c368c9317d6ffc77369ebde90587a133f297de2f9d6',
+  'package.json': '939e767f25efcfc7fa966736c43da29a0a08321fe3c236c9332358c05d4c9b67',
   'index.mjs': 'ed3ae05baaf0b05eba12eea385fc53cbc942752598fe420b6c2e355e82c862f2',
-  'client.js': '475752a9fa728eface19de21a88f31a581d65d7e5b3c256293da1f7b6edfb672',
+  'client.js': '371d4f4bdc93bc9913d638a90cb0c876514779715a0f65bd932946a9c062e3dd',
 }
 let failed = 0
 const ok = (label, pass, detail = '') => { console.log(`${pass ? 'OK  ' : 'FAIL'}  ${label}${detail ? '  — ' + detail : ''}`); if (!pass) failed++ }

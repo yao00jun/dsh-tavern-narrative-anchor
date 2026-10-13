@@ -17,6 +17,7 @@ window.__ModuleLoader__.load({
 .na-sec::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--na-accent);flex:none}
 .na-grow{flex:1;min-width:0;font-weight:400;font-size:12px;opacity:.7;text-align:right}
 .na-input,.na-select,.na-area{width:100%;box-sizing:border-box;padding:4px 8px;border-radius:6px;border:1px solid var(--na-line);background:transparent;color:inherit;font:inherit}
+.na-select option{background:var(--dsh-tavern-surface,#1e1e24);color:var(--dsh-tavern-text,#e0e0e0)}
 .na-area{resize:vertical}
 .na-btn{padding:2px 9px;border-radius:6px;border:1px solid var(--na-line);background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap}
 .na-btn:hover:not([disabled]){border-color:var(--na-accent);color:var(--na-accent)}
