@@ -1,61 +1,15 @@
 {
-  "name": "dsh-tavern-narrative-anchor",
-  "version": "1.0.0",
-  "description": "DSH-Tavern standard hot-pluggable narrative anchor and multi-dimensional memory compaction plugin",
-  "author": "yao00jun",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yao00jun/dsh-tavern-narrative-anchor.git"
-  },
+  "name": "narrative-anchor-v2",
+  "private": true,
   "type": "module",
-  "main": "index.mjs",
   "exports": {
     ".": "./index.mjs",
-    "./client": "./client.js",
-    "./package.json": "./package.json"
+    "./client": "./client.js"
   },
-  "files": [
-    "lib",
-    "client.js",
-    "index.mjs",
-    "cordis.patch.yml",
-    "run-install.cmd",
-    "install.ps1",
-    "README.md",
-    "LICENSE"
-  ],
-  "license": "MIT",
-  "keywords": [
-    "dsh",
-    "dsh-plugin",
-    "dsh-tavern",
-    "tavern",
-    "tavern-plugin",
-    "narrative-anchor",
-    "memory",
-    "compaction"
-  ],
   "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
     "client": {
       "platform": "web",
-      "immediately": true,
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
-    },
-    "compatibility": {
-      "dsh": ">=0.1.0-rc.8 <0.2.0",
-      "tavern": ">=2.6.0"
+      "inject": ["dsh-tavern-plugin"]
     }
-  },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.2 <0.2.0",
-    "@deepseek-ai/dsh-session": ">=0.1.5-rc.2 <0.2.0"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }
